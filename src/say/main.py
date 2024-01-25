@@ -239,7 +239,9 @@ if [ -f {tmp_output} ]; then
     exit 1
 fi
 {shlex.join(tts_cmd)}
+retcode=$?
 rm -f {tmp_output}
+exit $retcode
 '''
 
     output = cachedir / 'speech.wav'
