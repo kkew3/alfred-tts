@@ -215,8 +215,9 @@ def says(
         cfg = {}
     model = cfg.get('model', None)
     speaker = cfg.get('speaker', None)
+    lang = os.getenv('lang')
     tmp_output = '/tmp/tts_output.wav'
-    cmd = [
+    tts_cmd = [
         str(tts_bin),
         '--text',
         message,
@@ -225,17 +226,21 @@ def says(
         '--pipe_out',
     ]
     if device:
-        cmd.extend(['--use_cuda', device])
+        tts_cmd.extend(['--use_cuda', device])
     if model:
-        cmd.extend(['--model_name', model])
+        tts_cmd.extend(['--model_name', model])
     if speaker:
-        cmd.extend(['--speaker_idx', speaker])
-    cmdline = f'if [ -f {tmp_output} ]; then\n'
-    cmdline += f'echo {tmp_output} already exists >&2\n'
-    cmdline += 'exit 1\n'
-    cmdline += 'fi\n'
-    cmdline += shlex.join(cmd) + '\n'
-    cmdline += f'rm -f {tmp_output}\n'
+        tts_cmd.extend(['--speaker_idx', speaker])
+    if lang:
+        tts_cmd.extend(['--language_idx', lang])
+    cmdline = f'''\
+if [ -f {tmp_output} ]; then
+    echo {tmp_output} already exists >&2
+    exit 1
+fi
+{shlex.join(tts_cmd)}
+rm -f {tmp_output}
+'''
 
     output = cachedir / 'speech.wav'
     with subprocess.Popen(
