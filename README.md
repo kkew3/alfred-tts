@@ -57,6 +57,9 @@ pip install TTS
 
 It should be straightforward after installing `Say.alfredworkflow`.
 
+A trick worth mentioning: you may launch `says` (or its variants), close the Alfred popup, and issue keyword `playagain` once you receive notification "TTS Processing Complete".
+This way, you won't need to keep the Alfred popup frontmost while waiting, preventing you from doing anything else.
+
 ## License
 
 To use certain models included in TTS, you'll need to agree [CPML](https://coqui.ai/cpml).

@@ -281,6 +281,12 @@ exit $retcode
             output.unlink()
             logger.error('Returns nonzero %d; unlinked the output', retcode)
     if retcode == 0:
+        applescript = ('display notification '
+                       '"Listen with Alfred keyword \'sayagain\'" '
+                       'with title "TTS Processing Complete!" '
+                       'sound name "Blow"')
+        subprocess.run(['osascript', '-e', applescript])
+    if retcode == 0:
         resp = {
             'items': [
                 {
