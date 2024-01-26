@@ -327,11 +327,11 @@ on run argv
     set theFile to the first item of argv
     set theFile to POSIX file theFile
     tell application "QuickTime Player"
-        log "QuickTimer Player started"
         set theAudio to open file theFile
         tell theAudio
             set theDuration to duration
             play
+            log "QuickTimer Player started"
         end tell
         delay theDuration + 1
         close theAudio
