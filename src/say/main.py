@@ -8,6 +8,8 @@ from pathlib import Path
 import shutil
 import shlex
 import logging
+import threading
+import queue
 
 
 def make_parser():
@@ -287,6 +289,13 @@ exit $retcode
     print(json.dumps(resp), end='')
 
 
+def enqueue_output(out: ty.BinaryIO, q: queue.Queue):
+    """See https://stackoverflow.com/a/4896288/7881370."""
+    for line in iter(out.readline, b''):
+        q.put(line)
+    out.close()
+
+
 def speak_result():
     logger = logging.getLogger('speak_result')
     result_wav = Path(os.environ['result_wav'])
@@ -304,6 +313,7 @@ on run argv
     set theFile to the first item of argv
     set theFile to POSIX file theFile
     tell application "QuickTime Player"
+        log "QuickTimer Player started"
         set theAudio to open file theFile
         tell theAudio
             set theDuration to duration
@@ -319,12 +329,27 @@ end run'''
         cmd.extend(['-e', line.strip()])
     cmd.append(str(result_mp3))
     logger.debug('Command issued: %s', ' '.join(cmd))
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as err:
-        logger.error(
-            'Call to osascript (QuickTime Player) failed with err: %s', err)
-        return
+    with subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True) as proc:
+        # See https://stackoverflow.com/a/4896288/7881370.
+        q = queue.Queue()
+        t = threading.Thread(
+            target=enqueue_output, args=(proc.stderr, q), daemon=True)
+        t.start()
+        try:
+            _line = q.get(timeout=5)
+        except queue.Empty:
+            # Doesn't receive the log message. QuickTime Player is not launched
+            # correctly.
+            proc.terminate()
+            proc.wait()
+            logger.error('QuickTime Player is not launched correctly')
+            return
+        retcode = proc.wait()
+        if retcode != 0:
+            logger.error(
+                'Call to osascript (QuickTime Player) returns nonzero: %d',
+                retcode)
+            return
 
 
 def main():
