@@ -124,37 +124,51 @@ def list_model_names(host: ty.Optional[str], tts_bin: Path):
     print(json.dumps(resp), end='')
 
 
-def list_speakers(host: ty.Optional[str], tts_bin: Path):
+def list_speakers(host: ty.Optional[str], tts_bin: Path, cachedir: Path):
     logger = logging.getLogger('list_speakers')
     model = os.environ['model']
-    cmd = form_tts_cmdline(host, tts_bin, [
-        '--model_name', model, '--list_speaker_idxs', '--progress_bar', 'false'
-    ])
-    resp = None
-    with subprocess.Popen(
-            cmd,
-            text=True,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            encoding='utf-8') as proc:
-        logger.info('Process PID: %d', proc.pid)
-        logger.debug('Command issued: %s', ' '.join(cmd))
-        for line in proc.stdout:
-            line = line.strip()
-            logger.debug('Read line: %r', line)
-            if line.startswith('dict_keys(['):
-                line = line[len('dict_keys(['):-len('])')]
-                names = [x[1:-1] for x in line.split(', ')]
-                resp = {'items': [{'title': x, 'arg': x} for x in names]}
-                break
-            if 'I agree to the terms' in line:
-                proc.stdin.write('y\n')
-                proc.stdin.flush()
-        proc.stdin.close()
-        retcode = proc.wait()
-    if not resp:
-        logger.warning('Alfred response not set with retcode %d', retcode)
+    try:
+        with open(cachedir / 'speakers.json', encoding='utf-8') as infile:
+            all_speakers = json.load(infile)
+    except FileNotFoundError:
+        all_speakers = {}
+    speakers = all_speakers.get(model, [])
+    if speakers is not None and not speakers:
+        cmd = form_tts_cmdline(host, tts_bin, [
+            '--model_name', model, '--list_speaker_idxs', '--progress_bar',
+            'false'
+        ])
+        with subprocess.Popen(
+                cmd,
+                text=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                encoding='utf-8') as proc:
+            logger.info('Process PID: %d', proc.pid)
+            logger.debug('Command issued: %s', ' '.join(cmd))
+            for line in proc.stdout:
+                line = line.strip()
+                logger.debug('Read line: %r', line)
+                if line.startswith('dict_keys(['):
+                    line = line[len('dict_keys(['):-len('])')]
+                    speakers = [x[1:-1] for x in line.split(', ')]
+                    break
+                if 'I agree to the terms' in line:
+                    proc.stdin.write('y\n')
+                    proc.stdin.flush()
+            else:
+                speakers = None
+            proc.stdin.close()
+            retcode = proc.wait()
+        all_speakers[model] = speakers
+        with open(
+                cachedir / 'speakers.json', 'w', encoding='utf-8') as outfile:
+            json.dump(all_speakers, outfile)
+    if speakers:
+        resp = {'items': [{'title': x, 'arg': x} for x in speakers]}
+    else:
+        logger.warning('speakers not set')
         resp = {
             'items': [{
                 'title': 'default speaker',
@@ -362,7 +376,8 @@ def main():
     elif args.func == 'list-speakers':
         host = get_host()
         tts = get_tts()
-        list_speakers(host, tts)
+        cachedir = get_cachedir()
+        list_speakers(host, tts, cachedir)
     elif args.func == 'save-cfg':
         datadir = get_datadir()
         save_cfg(datadir)
