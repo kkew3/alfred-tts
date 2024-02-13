@@ -13,6 +13,10 @@ Of course, you may still install the TTS models locally on macOS.
 
 - `ffmpeg`
 
+Optional:
+
+- [`mpg123`](https://www.mpg123.de): If not installed, will fall back to QuickTime Player.
+
 ### Remote
 
 - [`TTS`](https://github.com/mozilla/TTS)

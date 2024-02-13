@@ -316,8 +316,8 @@ def enqueue_output(out: ty.BinaryIO, q: queue.Queue):
     out.close()
 
 
-def speak_result():
-    logger = logging.getLogger('speak_result')
+def speak_result_qtplayer():
+    logger = logging.getLogger('speak_result_qtplayer')
     result_wav = Path(os.environ['result_wav'])
     logger.debug('Received result_wav as: %s', result_wav)
     result_mp3 = result_wav.with_suffix('.mp3')
@@ -372,6 +372,31 @@ end run'''
             return
 
 
+def speak_result_mpg123():
+    logger = logging.getLogger('speak_result_mpg123')
+    result_wav = Path(os.environ['result_wav'])
+    logger.debug('Received result_wav as: %s', result_wav)
+    result_mp3 = result_wav.with_suffix('.mp3')
+    cmd = ['ffmpeg', '-y', '-i', str(result_wav), str(result_mp3)]
+    logger.debug('Command issued: %s', ' '.join(cmd))
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as err:
+        logger.error('Call to ffmpeg failed with err: %s', err)
+        return
+    cmd = ['mpg123', str(result_mp3)]
+    logger.debug('Command issued: %s', ' '.join(cmd))
+    try:
+        subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True)
+    except subprocess.CalledProcessError as err:
+        logger.error('Call to mpg123 returns nonzero: %d', err.returncode)
+        return
+
+
 def main():
     args = make_parser().parse_args()
     config_logging()
@@ -398,7 +423,10 @@ def main():
         cachedir = get_cachedir()
         says(host, tts, device, datadir, cachedir, args.message)
     elif args.func == 'play-result':
-        speak_result()
+        if shutil.which('mpg123'):
+            speak_result_mpg123()
+        else:
+            speak_result_qtplayer()
 
 
 if __name__ == '__main__':
